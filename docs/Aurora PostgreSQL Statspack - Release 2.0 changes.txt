@@ -1,0 +1,21 @@
+Aurora PostgreSQL Statspack - Release 2.0 changes
+
+Date: 01/03/2023
+Author: Santiago Villa
+
+1) New statistics captured.
+
+	a) Table stats (from pg_stat_all_tables) saved into statspack.hist_pg_stat_all_tables
+	b) New table to capture indexes with high null ratio: statspack.hist_indexes_with_nulls
+	
+2) Changes to the statspack report.
+
+	a) full report re-design.
+	b) added information about full scans on big tables, it may need new indexes.
+	c) top statements sections redefined to reduce output, but keeping useful info to detect issues
+	d) added weight (level %) of every statement on top compared to the whole captured volume. 
+	e) added information about indexes with high ratio of null values
+	
+	
+
+	
