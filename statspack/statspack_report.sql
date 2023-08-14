@@ -1,5 +1,7 @@
 \set ECHO errors
 
+\encoding UTF8
+
 \pset footer off
 \pset pager off
 
@@ -23,7 +25,7 @@ order by snap_id asc;
 \H
 \pset border 0
 \pset tuples_only
-SELECT 'Aurora PostgreSQL Statspack report - Created by Santiago Villa';
+\qecho <h1>Aurora PostgreSQL Statspack report - Created by Santiago Villa</h1>
 SELECT 'Statspack v2.0 report generated from '||server_id||' server at ',now() at time zone 'America/New_York' FROM aurora_global_db_instance_status() where session_id='MASTER_SESSION_ID';
 \pset tuples_only off
 
@@ -46,9 +48,7 @@ WHERE snap_id in (:END_SNAP,:BEGIN_SNAP);
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'DATABASE STATISTICS';
-\pset tuples_only off
+\qecho <h2>DATABASE STATISTICS</h2>
 \pset border 1
 
 select
@@ -93,9 +93,7 @@ on
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 ACTIVE SESSIONS WAIT EVENTS';
-\pset tuples_only off
+\qecho <h2>TOP 10 ACTIVE SESSIONS WAIT EVENTS</h2>
 \pset border 1
 
 select
@@ -111,7 +109,7 @@ select
         last_snap.xact_start at time zone 'America/New_York' as xact_start,
         last_snap.query_start at time zone 'America/New_York' as query_start,
         last_snap.state_change at time zone 'America/New_York' as state_change,
-        last_snap.query
+        substr(last_snap.query,1,100) as query
 from
         (
         select
@@ -139,22 +137,12 @@ order by
         (last_snap.wait_time-coalesce(first_snap.wait_time,0)) desc nulls last
 limit 10;
 
-\if :ROW_COUNT
-    \echo ' '
-\else
-    \pset tuples_only
-    select 'No active sessions captured.';
-    \pset tuples_only off
-\endif
-
 \pset border 0
 \pset tuples_only
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 SYSTEM WAIT EVENTS';
-\pset tuples_only off
+\qecho <h2>TOP 10 SYSTEM WAIT EVENTS</h2>
 \pset border 1
 
 select
@@ -190,13 +178,11 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 STATEMENTS BY TOTAL EXECUTION TIME';
-\pset tuples_only off
+\qecho <h2>TOP 10 STATEMENTS BY TOTAL EXECUTION TIME</h2>
 \pset border 1
 
 select
-        last_snap.queryid,
+        pu.usename,
         to_char(((last_snap.total_exec_time-first_snap.total_exec_time)/ sum((last_snap.total_exec_time-first_snap.total_exec_time)) over()) * 100, 'FM90D0') || '%' as "total_exec_time_%",
         interval '1 millisecond' * (last_snap.total_exec_time-first_snap.total_exec_time) as total_exec_time,
         to_char((last_snap.calls-first_snap.calls), 'FM999G999G999G990') as calls,
@@ -204,9 +190,13 @@ select
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
                 else 0
         end as time_by_call_secs,
+        case
+                when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.rows-coalesce(first_snap.rows, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                else 0
+        end as rows_by_call,
         (last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written) as io_blks,
         interval '1 second' * (last_snap.blk_read_time + last_snap.blk_write_time - first_snap.blk_read_time - first_snap.blk_write_time) / 1000 as io_time,
-        last_snap.query
+        substr(last_snap.query,1,100) as query
 from
         (
         select
@@ -238,12 +228,11 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 STATEMENTS BY EXECUTION TIME PER CALL';
-\pset tuples_only off
+\qecho <h2>TOP 10 STATEMENTS BY EXECUTION TIME PER CALL</h2>
 \pset border 1
 
 select
+        pu.usename,
         last_snap.queryid,
         to_char(((case
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
@@ -258,9 +247,13 @@ select
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
                 else 0
         end as time_by_call_secs,
+        case
+                when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.rows-coalesce(first_snap.rows, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                else 0
+        end as rows_by_call,
         (last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written) as io_blks,
         interval '1 second' * (last_snap.blk_read_time + last_snap.blk_write_time - first_snap.blk_read_time - first_snap.blk_write_time) / 1000 as io_time,
-        last_snap.query
+        substr(last_snap.query,1,100) as query
 from
         (
         select
@@ -293,12 +286,11 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 STATEMENTS BY IO by call';
-\pset tuples_only off
+\qecho <h2>TOP 10 STATEMENTS BY IO by call</h2>
 \pset border 1
 
 select
+        pu.usename,
         last_snap.queryid,
         to_char(((case
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round(((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)
@@ -315,6 +307,10 @@ select
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
                 else 0
         end as time_by_call_secs,
+        case
+                when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.rows-coalesce(first_snap.rows, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                else 0
+        end as rows_by_call,
         (last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written) as io_blks,
         case
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round(((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)
@@ -322,7 +318,7 @@ select
                 else 0
         end as IO_blks_by_call,
                 interval '1 second' * (last_snap.blk_read_time + last_snap.blk_write_time - first_snap.blk_read_time - first_snap.blk_write_time) / 1000 as io_time,
-        last_snap.query
+        substr(last_snap.query,1,100) as query
 from
         (
         select
@@ -354,12 +350,11 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 STATEMENTS BY TOTAL IO';
-\pset tuples_only off
+\qecho <h2>TOP 10 STATEMENTS BY TOTAL IO</h2>
 \pset border 1
 
 select
+        pu.usename,
         last_snap.queryid,
         to_char(((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)/ sum((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)) over()) * 100, 'FM90D0') || '%' as "IO_%",
         interval '1 millisecond' * (last_snap.total_exec_time-first_snap.total_exec_time) as total_exec_time,
@@ -368,6 +363,10 @@ select
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
                 else 0
         end as time_by_call_secs,
+        case
+                when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.rows-coalesce(first_snap.rows, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                else 0
+        end as rows_by_call,
         (last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written) as io_blks,
         case
                 when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round(((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)
@@ -375,7 +374,7 @@ select
                 else 0
         end as IO_blks_by_call,
                 interval '1 second' * (last_snap.blk_read_time + last_snap.blk_write_time - first_snap.blk_read_time - first_snap.blk_write_time) / 1000 as io_time,
-        last_snap.query
+        substr(last_snap.query,1,100) as query
 from
         (
         select
@@ -407,9 +406,7 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'SEQUENCIAL SCANS BETWEEN SNAPSHOTS - Check if we need indexes';
-\pset tuples_only off
+\qecho <h2>SEQUENCIAL SCANS BETWEEN SNAPSHOTS - Check if we need indexes</h2>
 \pset border 1
 
 select
@@ -455,9 +452,7 @@ limit 10;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'SEQUENCIAL SCANS FROM TABLE STATS (Cumulative) - Top 20 - Check if we need indexes';
-\pset tuples_only off
+\qecho <h2>SEQUENCIAL SCANS FROM TABLE STATS (Cumulative) - Top 20 - Check if we need indexes</h2>
 \pset border 1
 
 select
@@ -487,9 +482,7 @@ limit 20;
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'TOP 10 INDEXES WITH A HIGH RATIO OF NULL VALUES';
-\pset tuples_only off
+\qecho <h2>TOP 10 INDEXES WITH A HIGH RATIO OF NULL VALUES</h2>
 \pset border 1
 
 select
@@ -522,9 +515,154 @@ LIMIT 10;
 select ' ' as T;
 \pset tuples_only off
 
+\qecho <h2>HEAVY QUERIES - FULL TEXT AND EXPLAIN PLANS</h2>
+\pset border 1
+
+select
+        full_stmts.queryid ,
+        hdp.sql_hash ,
+        hdp.plan_hash ,
+        hdp.enabled ,
+        hdp.status ,
+        hdp.created_by ,
+        round(hdp.estimated_total_cost , 0) as estimated_total_cost,
+        hdp.last_used ,
+        hdp.explain_plan,
+        full_stmts.query 
+from
+        (
+        select
+                snap_id,
+                queryid ,
+                query
+        from
+                statspack.hist_pg_stat_statements hpss
+        where
+                snap_id = :END_SNAP
+                and
+                queryid in (
+        (
+                select
+                        last_snap.queryid
+                from
+                        (
+                        select
+                                *
+                        from
+                                statspack.hist_pg_stat_statements
+                        where
+                                snap_id = :END_SNAP ) last_snap
+                left join
+(
+                        select
+                                *
+                        from
+                                statspack.hist_pg_stat_statements
+                        where
+                                snap_id = :BEGIN_SNAP ) first_snap
+on
+                        last_snap.userid = first_snap.userid
+                        and last_snap.dbid = first_snap.dbid
+                        and last_snap.queryid = first_snap.queryid
+                join pg_catalog.pg_user pu on
+                        last_snap.userid = pu.usesysid
+                order by
+                        case
+                                when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round((((last_snap.total_exec_time-coalesce(first_snap.total_exec_time, 0))/ 1000)/(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                                else 0
+                        end desc nulls last,
+                        (last_snap.calls-first_snap.calls) desc nulls last
+                limit 10)
+union
+        (
+        select
+                last_snap.queryid
+        from
+                (
+                select
+                        *
+                from
+                        statspack.hist_pg_stat_statements
+                where
+                        snap_id = :END_SNAP ) last_snap
+        left join
+(
+                select
+                        *
+                from
+                        statspack.hist_pg_stat_statements
+                where
+                        snap_id = :BEGIN_SNAP ) first_snap
+on
+                last_snap.userid = first_snap.userid
+                and last_snap.dbid = first_snap.dbid
+                and last_snap.queryid = first_snap.queryid
+        join pg_catalog.pg_user pu on
+                last_snap.userid = pu.usesysid
+        order by
+                case
+                        when last_snap.calls-coalesce(first_snap.calls, 0) > 0 then round(((last_snap.shared_blks_read + last_snap.shared_blks_written-first_snap.shared_blks_read - first_snap.shared_blks_written)
+                /(last_snap.calls-coalesce(first_snap.calls, 0)))::numeric, 1)
+                        else 0
+                end desc nulls last
+        limit 10
+        )
+union
+        (
+select
+                last_snap.queryid
+from
+                (
+        select
+                        *
+        from
+                        statspack.hist_pg_stat_statements
+        where
+                        snap_id = :END_SNAP ) last_snap
+left join
+(
+        select
+                        *
+        from
+                        statspack.hist_pg_stat_statements
+        where
+                        snap_id = :BEGIN_SNAP ) first_snap
+on
+                last_snap.userid = first_snap.userid
+        and last_snap.dbid = first_snap.dbid
+        and last_snap.queryid = first_snap.queryid
+join pg_catalog.pg_user pu on
+                last_snap.userid = pu.usesysid
+order by
+                (last_snap.shared_blks_read + last_snap.shared_blks_written-coalesce(first_snap.shared_blks_read, 0) - coalesce(first_snap.shared_blks_written, 0)) desc nulls last
+limit 10
+        )
+)
+) full_stmts
+left join statspack.hist_dba_plans hdp
+on
+        full_stmts.queryid = hdp.queryid
+        and full_stmts.snap_id = hdp.snap_id
+order by
+        full_stmts.queryid ,
+        hdp.sql_hash ,
+        hdp.last_used,
+        hdp.estimated_total_cost ;
+
+\if :ROW_COUNT
+    \echo ' '
+\else
+    \pset tuples_only
+    select 'No SQL or dba_plans found for heavy queries.';
+    \pset tuples_only off
+\endif
+
+\pset border 0
 \pset tuples_only
-SELECT 'PG installed extensions';
+select ' ' as T;
 \pset tuples_only off
+
+\qecho <h2>PG installed extensions</h2>
 \pset border 1
 
 select
@@ -551,9 +689,7 @@ order by
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'DB Parameter changes';
-\pset tuples_only off
+\qecho <h2>DB Parameter changes</h2>
 \pset border 1
 
 select
@@ -595,9 +731,7 @@ order by
 select ' ' as T;
 \pset tuples_only off
 
-\pset tuples_only
-SELECT 'Full list of DB parameters';
-\pset tuples_only off
+\qecho <h2>Full list of DB parameters</h2>
 \pset border 1
 
 select
@@ -610,8 +744,5 @@ where
                 snap_id = :END_SNAP
 order by name;
 
-\pset border 0
-\pset tuples_only
-SELECT ' ';
-SELECT 'Aurora PostgreSQL Statspack - Created by Santiago Villa - https://dba-santiago.blogspot.com/2022/12/aurora-postgresql-statspack.html';
+\qecho <h3>Aurora PostgreSQL Statspack - Created by Santiago Villa - <a href="https://dba-santiago.blogspot.com/2022/12/aurora-postgresql-statspack.html" target="_blank">https://dba-santiago.blogspot.com/2022/12/aurora-postgresql-statspack.html</a></h3>
 \pset tuples_only off

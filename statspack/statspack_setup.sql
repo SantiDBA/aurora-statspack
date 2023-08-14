@@ -1,3 +1,4 @@
+
 -- this script will create all the objects needed by Aurora Statspack package.
 create schema IF NOT EXISTS statspack;
 
@@ -61,6 +62,7 @@ SELECT 1 as snap_id, a.pid,
              a.xact_start,
              a.query_start,
              a.state_change,
+			 a.query_id,
              a.query
         FROM (SELECT pid,
                      usename,
@@ -72,6 +74,7 @@ SELECT 1 as snap_id, a.pid,
                      xact_start,
                      query_start,
                      state_change,
+                     query_id,
                      query,
                      (aurora_stat_backend_waits(pid)).*
                 FROM pg_stat_activity
@@ -127,7 +130,66 @@ where
 	and array_length(i.indkey, 1) = 1
 	-- Exclude indexes without null_frac ratio
 	and coalesce(s.null_frac, 0) != 0;
+
+drop table if exists statspack.hist_dba_plans;
+
+create table statspack.hist_dba_plans as
+SELECT 1 as snap_id, 
+	dp.queryid ,
+	dp.sql_hash,
+	dp.plan_hash ,
+	dp.enabled ,
+	dp.status ,
+	dp.created_by,
+	dp.sql_text ,
+	dp.estimated_total_cost,
+	dp.plan_created ,
+	dp.last_verified ,
+	dp.last_validated ,
+	dp.last_used 	,
+	dp.plan_outline, dp.plan_outline as explain_plan
+	from apg_plan_mgmt.dba_plans dp;
 	
+	
+-- Converts plan_outline column value in human explain plan if possible
+create or replace
+function statspack.get_explain_plan (
+   p_sql_hash int4,
+   p_plan_hash int4
+) returns text
+as
+$$
+declare
+v_explain_plan text;
+
+begin
+	begin
+		select
+			apg_plan_mgmt.get_explain_plan(
+			p_sql_hash,
+			p_plan_hash)
+		into
+			v_explain_plan;
+
+	exception
+		-- IF apg_plan_mgmt.get_explain_plan returns error, then keep plan_outline column value
+		when others then
+			select
+				plan_outline
+			into
+				v_explain_plan
+			from
+				apg_plan_mgmt.dba_plans dp
+			where
+				dp.sql_hash = p_sql_hash
+				and dp.plan_hash = p_plan_hash;
+	end;
+
+	return v_explain_plan;
+end;
+
+$$
+language plpgsql;
 	
 CREATE OR REPLACE PROCEDURE statspack.statspack_snapshot()
  LANGUAGE plpgsql
@@ -146,8 +208,7 @@ select v_snap_id, now();
 -- Capture from pg_stat_statements for queries with some consumption
 insert into statspack.hist_pg_stat_statements
 select v_snap_id as snap_id, pss.*
-from pg_stat_statements pss
-where rows != 0 or shared_blks_hit != 0 or shared_blks_read != 0 or shared_blks_written != 0 or temp_blks_read != 0 or temp_blks_written != 0;
+from pg_stat_statements pss;
 
 -- insert from aurora_stat_system_waits
 insert into statspack.hist_stat_system_waits
@@ -175,6 +236,7 @@ SELECT v_snap_id as snap_id, a.pid,
              a.xact_start,
              a.query_start,
              a.state_change,
+			 a.query_id,
              a.query
         FROM (SELECT pid,
                      usename,
@@ -186,6 +248,7 @@ SELECT v_snap_id as snap_id, a.pid,
                      xact_start,
                      query_start,
                      state_change,
+					 query_id,
                      query,
                      (aurora_stat_backend_waits(pid)).*
                 FROM pg_stat_activity
@@ -260,6 +323,26 @@ where
 	-- Exclude indexes without null_frac ratio
 	and coalesce(s.null_frac, 0) != 0;
 
+insert into statspack.hist_dba_plans
+SELECT v_snap_id, 
+	dp.queryid ,
+	dp.sql_hash,
+	dp.plan_hash ,
+	dp.enabled ,
+	dp.status ,
+	dp.created_by,
+	dp.sql_text ,
+	dp.estimated_total_cost,
+	dp.plan_created ,
+	dp.last_verified ,
+	dp.last_validated ,
+	dp.last_used 	,
+	dp.plan_outline,
+	statspack.get_explain_plan(
+    dp.sql_hash,
+	dp.plan_hash) as explain_plan
+	from apg_plan_mgmt.dba_plans dp;
+	
 end;
 $procedure$
 ;
@@ -290,6 +373,12 @@ delete from statspack.hist_pg_users
 where snap_id = p_snap_id;
 
 delete from statspack.hist_pg_stat_all_tables
+where snap_id = p_snap_id;
+
+delete from statspack.hist_indexes_with_nulls
+where snap_id = p_snap_id;
+
+delete from statspack.hist_dba_plans
 where snap_id = p_snap_id;
 
 delete from statspack.hist_snapshots
