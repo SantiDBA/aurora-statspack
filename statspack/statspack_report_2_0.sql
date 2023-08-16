@@ -545,6 +545,34 @@ select ' ' as T;
 \pset tuples_only off
 
 \pset tuples_only
+\qecho <h2>TOP 10 INDEXES CANDIDATES TO BE DROPPED</h2>
+\pset tuples_only off
+\pset border 1
+
+select
+        *
+from
+        statspack.hist_unused_indexes p
+where
+        snap_id = :END_SNAP
+order by
+        idx_scan asc, index_size desc
+LIMIT 10;
+
+\if :ROW_COUNT
+    \echo ' '
+\else
+    \pset tuples_only
+    select 'No indexes found.';
+    \pset tuples_only off
+\endif
+
+\pset border 0
+\pset tuples_only
+select ' ' as T;
+\pset tuples_only off
+
+\pset tuples_only
 \qecho <h2>HEAVY QUERIES - FULL TEXT AND EXPLAIN PLANS</h2>
 \pset tuples_only off
 \pset border 1

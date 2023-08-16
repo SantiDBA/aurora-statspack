@@ -149,8 +149,31 @@ SELECT 1 as snap_id,
 	dp.last_used 	,
 	dp.plan_outline, dp.plan_outline as explain_plan
 	from apg_plan_mgmt.dba_plans dp;
-	
-	
+
+drop table if exists statspack.hist_dba_plans;
+
+-- Saving indexes used less than 10 times
+create table statspack.hist_unused_indexes as	
+SELECT 1 as snap_id,
+       s.schemaname,
+       s.relname AS tablename,
+       s.indexrelname AS indexname,
+       pg_relation_size(s.indexrelid) AS index_size,
+       s.idx_scan, 
+       s.idx_tup_read, 
+       s.idx_tup_fetch 
+FROM pg_catalog.pg_stat_user_indexes s
+   JOIN pg_catalog.pg_index i ON s.indexrelid = i.indexrelid
+WHERE 0 <> ALL (i.indkey)  -- no index column is an expression
+  AND NOT i.indisunique   -- is not a UNIQUE index
+  AND NOT EXISTS          -- does not enforce a constraint
+         (SELECT 1 FROM pg_catalog.pg_constraint c
+          WHERE c.conindid = s.indexrelid)
+  AND NOT EXISTS          -- is not an index partition
+         (SELECT 1 FROM pg_catalog.pg_inherits AS inh
+          WHERE inh.inhrelid = s.indexrelid) and s.idx_scan < 10;
+
+
 -- Converts plan_outline column value in human explain plan if possible
 create or replace
 function statspack.get_explain_plan (
@@ -342,7 +365,28 @@ SELECT v_snap_id,
     dp.sql_hash,
 	dp.plan_hash) as explain_plan
 	from apg_plan_mgmt.dba_plans dp;
-	
+
+-- Saving indexes used less than 10 times
+insert into statspack.hist_unused_indexes as	
+SELECT v_snap_id,
+       s.schemaname,
+       s.relname,
+       s.indexrelname,
+       pg_relation_size(s.indexrelid),
+       s.idx_scan, 
+       s.idx_tup_read, 
+       s.idx_tup_fetch 
+FROM pg_catalog.pg_stat_user_indexes s
+   JOIN pg_catalog.pg_index i ON s.indexrelid = i.indexrelid
+WHERE 0 <> ALL (i.indkey)  -- no index column is an expression
+  AND NOT i.indisunique   -- is not a UNIQUE index
+  AND NOT EXISTS          -- does not enforce a constraint
+         (SELECT 1 FROM pg_catalog.pg_constraint c
+          WHERE c.conindid = s.indexrelid)
+  AND NOT EXISTS          -- is not an index partition
+         (SELECT 1 FROM pg_catalog.pg_inherits AS inh
+          WHERE inh.inhrelid = s.indexrelid) and s.idx_scan < 10;
+
 end;
 $procedure$
 ;
