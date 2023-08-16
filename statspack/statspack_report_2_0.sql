@@ -764,6 +764,25 @@ union
         query
         from statspack.hist_active_sessions_waits where snap_id = :END_SNAP and current_wait_type = wait_type and current_wait_event = wait_event
 )
+union 
+	(
+select
+	last_snap.queryid,
+	pu.usename ,
+	last_snap.snap_id,
+        last_snap.query
+from
+	(
+select
+		*
+from
+		statspack.hist_pg_stat_statements
+where
+		snap_id = :END_SNAP ) last_snap
+join statspack.hist_pg_users pu on last_snap.userid = pu.usesysid and pu.snap_id = last_snap.snap_id
+WHERE calls > 100 AND shared_blks_hit > 0
+order by (stddev_exec_time/mean_exec_time) desc nulls last
+limit 10)
          ) full_stmts
 left join statspack.hist_dba_plans hdp
 on
