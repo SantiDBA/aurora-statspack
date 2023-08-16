@@ -440,14 +440,14 @@ SELECT * FROM statspack.hist_pg_stat_statements pss
 		where pss.snap_id = :END_SNAP
 )
 SELECT queryid,
-    usename,
-    calls, 
-	min_exec_time,
-	max_exec_time, 
-	mean_exec_time,
-	stddev_exec_time,
-	(stddev_exec_time/mean_exec_time) AS coeff_of_variance,
-	query
+        usename,
+        calls,
+	round((min_exec_time/1000)::numeric,1) as "min_exec_time(secs)",
+        round((max_exec_time/1000)::numeric,1) as "max_exec_time(secs)",
+	round(mean_exec_time::numeric,2) as mean_exec_time,
+	round(stddev_exec_time::numeric,2) as stddev_exec_time,
+	round((stddev_exec_time/mean_exec_time)::numeric,2) AS coeff_of_variance,
+	substr(query,1,80) as partial_query
 FROM statements
 WHERE calls > 100
 AND shared_blks_hit > 0
