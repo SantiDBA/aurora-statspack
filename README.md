@@ -14,7 +14,7 @@ Statspack Tables and Procedures
 
 Tables:
     
-    -- statspack.hist_active_sessions_waits
+    - statspack.hist_active_sessions_waits
     statspack.hist_indexes_with_nulls
     statspack.hist_pg_settings
     statspack.hist_pg_stat_all_tables
