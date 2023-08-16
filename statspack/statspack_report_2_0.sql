@@ -430,6 +430,36 @@ select ' ' as T;
 \pset tuples_only off
 
 \pset tuples_only
+\qecho <h2>TOP 10 STATEMENTS WITH EXECUTION TIME DEVIATION</h2>
+\pset tuples_only off
+\pset border 1
+
+WITH statements AS (
+SELECT * FROM statspack.hist_pg_stat_statements pss
+		JOIN statspack.hist_pg_users pr ON (pss.userid=pr.usesysid and pss.snap_id=pr.snap_id)
+		where pss.snap_id = :END_SNAP
+)
+SELECT queryid,
+    usename,
+    calls, 
+	min_exec_time,
+	max_exec_time, 
+	mean_exec_time,
+	stddev_exec_time,
+	(stddev_exec_time/mean_exec_time) AS coeff_of_variance,
+	query
+FROM statements
+WHERE calls > 100
+AND shared_blks_hit > 0
+ORDER BY coeff_of_variance DESC
+LIMIT 10;
+
+\pset border 0
+\pset tuples_only
+select ' ' as T;
+\pset tuples_only off
+
+\pset tuples_only
 \qecho <h2>SEQUENCIAL SCANS BETWEEN SNAPSHOTS - Check if we need indexes</h2>
 \pset tuples_only off
 \pset border 1
