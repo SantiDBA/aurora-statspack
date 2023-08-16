@@ -531,14 +531,6 @@ order by
         expected_saving_bytes desc
 LIMIT 10;
 
-\if :ROW_COUNT
-    \echo ' '
-\else
-    \pset tuples_only
-    select 'No indexes with issues found.';
-    \pset tuples_only off
-\endif
-
 \pset border 0
 \pset tuples_only
 select ' ' as T;
@@ -558,14 +550,6 @@ where
 order by
         idx_scan asc, index_size desc
 LIMIT 10;
-
-\if :ROW_COUNT
-    \echo ' '
-\else
-    \pset tuples_only
-    select 'No indexes found.';
-    \pset tuples_only off
-\endif
 
 \pset border 0
 \pset tuples_only
@@ -824,14 +808,6 @@ on
 where last_snap.setting != coalesce(first_snap.setting,last_snap.setting) or last_snap.unit != coalesce(first_snap.unit,last_snap.unit)
 order by
         last_snap.name asc nulls last;
-
-\if :ROW_COUNT
-    \echo ' '
-\else
-    \pset tuples_only
-    select 'No DB parameter changes detected.';
-    \pset tuples_only off
-\endif
 
 \pset border 0
 \pset tuples_only
