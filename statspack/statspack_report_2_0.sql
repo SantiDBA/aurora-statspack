@@ -824,6 +824,6 @@ where
 order by name;
 
 \pset border 0
-\qecho <h3>Aurora PostgreSQL Statspack - Created by Santiago Villa - <a href="https://dba-santiago.blogspot.com/2022/12/aurora-postgresql-statspack.html" target="_blank">https://dba-santiago.blogspot.com/2022/12/aurora-postgresql-statspack.html</a></h3>
+\qecho <h3>Aurora PostgreSQL Statspack - Created by Santiago Villa - <a href="https://github.com/SantiDBA/aurora-statspack" target="_blank">https://github.com/SantiDBA/aurora-statspack</a></h3>
 \pset tuples_only off
 
