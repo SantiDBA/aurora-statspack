@@ -1,5 +1,4 @@
 \set ECHO errors
-
 \encoding UTF8
 
 \pset footer off
