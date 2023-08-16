@@ -11,17 +11,18 @@ Statspack Setup
 Run statspack_setup.sql script into the target Aurora PostgreSQL database to create all the Statspack objects.
 
 Statspack Tables and Procedures
+
 Tables:
-statspack.hist_active_sessions_waits
-statspack.hist_indexes_with_nulls
-statspack.hist_pg_settings
-statspack.hist_pg_stat_all_tables
-statspack.hist_pg_stat_database
-statspack.hist_pg_stat_statements
-statspack.hist_pg_users
-statspack.hist_snapshots
-statspack.hist_stat_system_waits
-statspack.statspack_config
+    statspack.hist_active_sessions_waits
+    statspack.hist_indexes_with_nulls
+    statspack.hist_pg_settings
+    statspack.hist_pg_stat_all_tables
+    statspack.hist_pg_stat_database
+    statspack.hist_pg_stat_statements
+    statspack.hist_pg_users
+    statspack.hist_snapshots
+    statspack.hist_stat_system_waits
+    statspack.statspack_config
 
 Procedures:
 
