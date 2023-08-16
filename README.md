@@ -57,13 +57,15 @@ Monitoring jobs and logs
     SELECT * from cron.job_run_details WHERE command like '%statspack%' order by end_time desc limit 10;
 
 Remove snapshot job
-SELECT cron.unschedule ('Statspack Snapshot');
+
+- SELECT cron.unschedule ('Statspack Snapshot');
 
 Remove Statspack purging job
-SELECT cron.unschedule ('Statspack Cleanup');
+
+- SELECT cron.unschedule ('Statspack Cleanup');
 
 Aurora Statspack Report
 
-Connect to the target Aurora DB and execute the statspack report (statspack_report.sql).
+- Connect to the target Aurora DB and execute the statspack report (statspack_report.sql).
 i.e.
 postgres=> \i statspack_report.sql
