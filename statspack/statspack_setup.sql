@@ -150,7 +150,7 @@ SELECT 1 as snap_id,
 	dp.plan_outline, dp.plan_outline as explain_plan
 	from apg_plan_mgmt.dba_plans dp;
 
-drop table if exists statspack.hist_dba_plans;
+drop table if exists statspack.hist_unused_indexes;
 
 -- Saving indexes used less than 10 times
 create table statspack.hist_unused_indexes as	
