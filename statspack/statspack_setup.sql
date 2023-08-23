@@ -367,7 +367,7 @@ SELECT v_snap_id,
 	from apg_plan_mgmt.dba_plans dp;
 
 -- Saving indexes used less than 10 times
-insert into statspack.hist_unused_indexes as	
+insert into statspack.hist_unused_indexes 
 SELECT v_snap_id,
        s.schemaname,
        s.relname,
