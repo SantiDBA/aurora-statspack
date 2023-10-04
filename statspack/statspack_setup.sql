@@ -139,7 +139,13 @@ SELECT 1 as snap_id,
 	dp.sql_hash,
 	dp.plan_hash ,
 	dp.enabled ,
-	dp.status ,
+	CASE dp.status
+        WHEN 0 THEN 'Preferred'::text
+        WHEN 1 THEN 'Approved'::text
+        WHEN 2 THEN 'Unapproved'::text
+        WHEN 3 THEN 'Rejected'::text
+        ELSE 'Unknown'::text
+    END AS status, 
 	dp.created_by,
 	dp.sql_text ,
 	dp.estimated_total_cost,
@@ -147,8 +153,8 @@ SELECT 1 as snap_id,
 	dp.last_verified ,
 	dp.last_validated ,
 	dp.last_used 	,
-	dp.plan_outline as explain_plan
-	from apg_plan_mgmt.dba_plans dp;
+	apg_plan_mgmt.pretty_outline(dp.plan_outline) as explain_plan
+	from apg_plan_mgmt.plans dp;
 
 drop table if exists statspack.hist_unused_indexes;
 
@@ -312,7 +318,13 @@ SELECT v_snap_id,
 	dp.sql_hash,
 	dp.plan_hash ,
 	dp.enabled ,
-	dp.status ,
+	CASE dp.status
+        WHEN 0 THEN 'Preferred'::text
+        WHEN 1 THEN 'Approved'::text
+        WHEN 2 THEN 'Unapproved'::text
+        WHEN 3 THEN 'Rejected'::text
+        ELSE 'Unknown'::text
+    END AS status, 
 	dp.created_by,
 	dp.sql_text ,
 	dp.estimated_total_cost,
@@ -320,8 +332,8 @@ SELECT v_snap_id,
 	dp.last_verified ,
 	dp.last_validated ,
 	dp.last_used 	,
-	dp.plan_outline as explain_plan
-	from apg_plan_mgmt.dba_plans dp;
+	apg_plan_mgmt.pretty_outline(dp.plan_outline) as explain_plan
+	from apg_plan_mgmt.plans dp;
 
 -- Saving indexes used less than 10 times
 insert into statspack.hist_unused_indexes 

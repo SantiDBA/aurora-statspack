@@ -596,6 +596,7 @@ select
 	full_stmts.usename,
 	hdp.sql_hash ,
 	hdp.plan_hash ,
+        full_stmts.toplevel,
 	hdp.enabled ,
 	hdp.status ,
 	round(hdp.estimated_total_cost,0) as estimated_total_cost,
@@ -606,6 +607,7 @@ from
 	(
 	(
 	select
+                last_snap.toplevel,
 		last_snap.queryid,
 		pu.usename ,
 		last_snap.snap_id,
@@ -641,6 +643,7 @@ on
 union 
 	(
 select
+	last_snap.toplevel,
 	last_snap.queryid,
 	pu.usename ,
 	last_snap.snap_id,
@@ -683,6 +686,7 @@ limit 10)
 union 
 	(
 select
+	last_snap.toplevel,
 	last_snap.queryid,
 	pu.usename ,
 	last_snap.snap_id,
@@ -724,6 +728,7 @@ limit 10)
 union 
 	(
 select
+	last_snap.toplevel,
 	last_snap.queryid,
 	pu.usename ,
 	last_snap.snap_id,
@@ -758,7 +763,9 @@ order by
 0)) desc nulls last
 limit 10)
 union
-(SELECT query_id as queryid,
+(SELECT 
+        true as toplevel,
+        query_id as queryid,
 	usename ,
 	snap_id,
         query
@@ -767,6 +774,7 @@ union
 union 
 	(
 select
+	last_snap.toplevel,
 	last_snap.queryid,
 	pu.usename ,
 	last_snap.snap_id,
