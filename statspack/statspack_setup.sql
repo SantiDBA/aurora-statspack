@@ -147,7 +147,7 @@ SELECT 1 as snap_id,
 	dp.last_verified ,
 	dp.last_validated ,
 	dp.last_used 	,
-	dp.plan_outline, dp.plan_outline as explain_plan
+	dp.plan_outline as explain_plan
 	from apg_plan_mgmt.dba_plans dp;
 
 drop table if exists statspack.hist_unused_indexes;
@@ -173,46 +173,6 @@ WHERE 0 <> ALL (i.indkey)  -- no index column is an expression
          (SELECT 1 FROM pg_catalog.pg_inherits AS inh
           WHERE inh.inhrelid = s.indexrelid) and s.idx_scan < 10;
 
-
--- Converts plan_outline column value in human explain plan if possible
-create or replace
-function statspack.get_explain_plan (
-   p_sql_hash int4,
-   p_plan_hash int4
-) returns text
-as
-$$
-declare
-v_explain_plan text;
-
-begin
-	begin
-		select
-			apg_plan_mgmt.get_explain_plan(
-			p_sql_hash,
-			p_plan_hash)
-		into
-			v_explain_plan;
-
-	exception
-		-- IF apg_plan_mgmt.get_explain_plan returns error, then keep plan_outline column value
-		when others then
-			select
-				plan_outline
-			into
-				v_explain_plan
-			from
-				apg_plan_mgmt.dba_plans dp
-			where
-				dp.sql_hash = p_sql_hash
-				and dp.plan_hash = p_plan_hash;
-	end;
-
-	return v_explain_plan;
-end;
-
-$$
-language plpgsql;
 	
 CREATE OR REPLACE PROCEDURE statspack.statspack_snapshot()
  LANGUAGE plpgsql
@@ -360,10 +320,7 @@ SELECT v_snap_id,
 	dp.last_verified ,
 	dp.last_validated ,
 	dp.last_used 	,
-	dp.plan_outline,
-	statspack.get_explain_plan(
-    dp.sql_hash,
-	dp.plan_hash) as explain_plan
+	dp.plan_outline as explain_plan
 	from apg_plan_mgmt.dba_plans dp;
 
 -- Saving indexes used less than 10 times
