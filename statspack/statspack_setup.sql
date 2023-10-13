@@ -92,8 +92,8 @@ from pg_stat_database psd;
 drop table if exists statspack.hist_pg_stat_all_tables ;
 
 create table statspack.hist_pg_stat_all_tables as
-select 1 as snap_id, psat.*
-from pg_stat_all_tables psat;
+select 1 as snap_id, psat.*, pc.reloptions
+from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid" ;
 
 drop table if exists statspack.hist_indexes_with_nulls ;
 
@@ -275,8 +275,8 @@ from pg_show_all_settings();
 
 -- insert from  pg_stat_all_tables
 insert into statspack.hist_pg_stat_all_tables 
-select v_snap_id as snap_id, psat.*
-from pg_stat_all_tables psat;
+select v_snap_id as snap_id, psat.*, pc.reloptions
+from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid" ;
 
 insert into statspack.hist_indexes_with_nulls
 select
