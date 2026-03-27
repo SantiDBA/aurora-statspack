@@ -179,6 +179,27 @@ WHERE 0 <> ALL (i.indkey)  -- no index column is an expression
          (SELECT 1 FROM pg_catalog.pg_inherits AS inh
           WHERE inh.inhrelid = s.indexrelid) and s.idx_scan < 10;
 
+drop table if exists statspack.hist_lock_tree;
+
+-- Capture lock blocker/blocked relationships at snapshot time
+create table statspack.hist_lock_tree (
+    snap_id              integer,
+    blocked_pid          integer,
+    blocked_usename      name,
+    blocked_app_name     text,
+    blocked_query        text,
+    blocked_xact_start   timestamptz,
+    blocker_pid          integer,
+    blocker_usename      name,
+    blocker_app_name     text,
+    blocker_query        text,
+    blocker_xact_start   timestamptz,
+    blocker_state        text,
+    lock_type            text,
+    lock_mode            text,
+    locked_relation      text
+);
+
 	
 CREATE OR REPLACE PROCEDURE statspack.statspack_snapshot()
  LANGUAGE plpgsql
@@ -356,6 +377,30 @@ WHERE 0 <> ALL (i.indkey)  -- no index column is an expression
          (SELECT 1 FROM pg_catalog.pg_inherits AS inh
           WHERE inh.inhrelid = s.indexrelid) and s.idx_scan < 10;
 
+-- Capture lock tree: blocker/blocked relationships
+insert into statspack.hist_lock_tree
+SELECT v_snap_id,
+       blocked.pid,
+       blocked.usename,
+       left(blocked.application_name, 16),
+       blocked.query,
+       blocked.xact_start,
+       blocker.pid,
+       blocker.usename,
+       left(blocker.application_name, 16),
+       blocker.query,
+       blocker.xact_start,
+       blocker.state,
+       bl.locktype,
+       bl.mode,
+       COALESCE(bl.relation::regclass::text,
+                bl.locktype || ':' || COALESCE(bl.transactionid::text, bl.virtualxid::text, ''))
+FROM pg_stat_activity blocked
+CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(blocker_pid)
+JOIN pg_stat_activity blocker ON blocker.pid = b.blocker_pid
+LEFT JOIN pg_locks bl ON bl.pid = blocked.pid AND NOT bl.granted
+WHERE blocked.wait_event_type = 'Lock';
+
 end;
 $procedure$
 ;
@@ -394,6 +439,12 @@ where snap_id = p_snap_id;
 delete from statspack.hist_dba_plans
 where snap_id = p_snap_id;
 
+delete from statspack.hist_lock_tree
+where snap_id = p_snap_id;
+
+delete from statspack.hist_unused_indexes
+where snap_id = p_snap_id;
+
 delete from statspack.hist_snapshots
 where snap_id = p_snap_id;
 
@@ -426,3 +477,43 @@ end loop;
 end;
 $procedure$
 ;
+
+-- Create indexes to optimize queries and statspack_cleanup
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_snapshots_snap_timestamp
+    ON statspack.hist_snapshots (snap_timestamp);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_snapshots_snap_id
+    ON statspack.hist_snapshots (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_active_sessions_waits_snap_id
+    ON statspack.hist_active_sessions_waits (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_dba_plans_snap_id
+    ON statspack.hist_dba_plans (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_indexes_with_nulls_snap_id
+    ON statspack.hist_indexes_with_nulls (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_pg_settings_snap_id
+    ON statspack.hist_pg_settings (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_pg_stat_all_tables_snap_id
+    ON statspack.hist_pg_stat_all_tables (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_pg_stat_database_snap_id
+    ON statspack.hist_pg_stat_database (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_stat_system_waits_snap_id
+    ON statspack.hist_stat_system_waits (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_unused_indexes_snap_id
+    ON statspack.hist_unused_indexes (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_pg_stat_statements_snap_id
+    ON statspack.hist_pg_stat_statements (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_pg_users_snap_id
+    ON statspack.hist_pg_users (snap_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hist_lock_tree_snap_id
+    ON statspack.hist_lock_tree (snap_id);

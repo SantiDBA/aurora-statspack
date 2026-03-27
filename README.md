@@ -1,71 +1,170 @@
-# aurora-statspack
+# Aurora PostgreSQL Statspack
 
-Aurora Statspack to monitor performance on Aurora compatible with PostgreSQL
+Performance monitoring toolkit for Amazon Aurora PostgreSQL — captures point-in-time snapshots of database activity into historical tables for trending, diagnostics, and capacity planning.
 
-Created by Santiago Villa, last modified on Jan 03, 2023
+**Created by Santiago Villa**
 
-This is a package to capture Aurora performance statistics in historical tables inside a new schema: statspack.
+---
 
-Statspack Setup
+## Features
 
-Run statspack_setup.sql script into the target Aurora PostgreSQL database to create all the Statspack objects.
+- **Statement analysis** — Top SQL by execution time, I/O, time-per-call, and execution variance
+- **Wait event tracking** — System-level and per-session wait events from Aurora-specific functions
+- **Database statistics** — Commits, rollbacks, deadlocks, cache hit ratios, temp file usage
+- **Table & index analysis** — Sequential scan detection, unused indexes, indexes with high null ratios
+- **Query plan management** — Historical capture of `apg_plan_mgmt` plans and explain output
+- **Parameter change tracking** — Detect DB parameter changes between snapshots
+- **Automated snapshots** — Schedule via `pg_cron` with configurable retention
 
-Statspack Tables and Procedures
+## Prerequisites
 
-Tables:
-    
-    - statspack.hist_active_sessions_waits
-    - statspack.hist_indexes_with_nulls
-    - statspack.hist_pg_settings
-    - statspack.hist_pg_stat_all_tables
-    - statspack.hist_pg_stat_database
-    - statspack.hist_pg_stat_statements
-    - statspack.hist_pg_users
-    - statspack.hist_snapshots
-    - statspack.hist_stat_system_waits
-    - statspack.statspack_config
+- Amazon Aurora PostgreSQL
+- Extensions: `pg_stat_statements`, `pg_cron` (for scheduling)
+- Optional: `apg_plan_mgmt` (for query plan history)
 
-Procedures:
+## Quick Start
 
-    -- Take Aurora snapshot from live views and functions
-    call statspack.statspack_snapshot();
+### 1. Install
 
-    -- Remove specific snapshot from Statspack schema
-    call statspack.statspack_remove_snapshot(1);
+Connect to your Aurora PostgreSQL database and run the setup script:
 
-    -- Remove snapshots based on retention configuration
-    call statspack.statspack_cleanup();
+```sql
+\i statspack_setup.sql
+```
 
-Setting up automatic Statspack jobs using pg_cron
+This creates the `statspack` schema with all tables, procedures, and configuration.
 
-    Create snapshot job
-    	SELECT cron.schedule('Statspack Snapshot', '*/10 * * * *', 'call statspack.statspack_snapshot()');
+### 2. Take a snapshot
 
-    	NOTE: this example will take one snapshot every 10 minutes
+```sql
+CALL statspack.statspack_snapshot();
+```
 
-    Create Statspack purging job
-    	SELECT cron.schedule('Statspack Cleanup', '0 0 * * *', 'call statspack.statspack_cleanup()');
+### 3. Schedule automatic snapshots with pg_cron
 
-    	NOTE: retention days is set on statspack_config table
+```sql
+-- Snapshot every 10 minutes
+SELECT cron.schedule('Statspack Snapshot', '*/10 * * * *', 'CALL statspack.statspack_snapshot()');
 
-Monitoring jobs and logs
+-- Daily cleanup of old snapshots
+SELECT cron.schedule('Statspack Cleanup', '0 0 * * *', 'CALL statspack.statspack_cleanup()');
+```
 
-    -- Check which Statpack jobs are scheduled on pg_cron
-    SELECT * from cron.job WHERE command like '%statspack%';
+> **Note:** Retention is controlled by `statspack.statspack_config.retention_days` (default: 7).
 
-    -- Check Statpack jobs execution in the log table
-    SELECT * from cron.job_run_details WHERE command like '%statspack%' order by end_time desc limit 10;
+### 4. Generate a report
 
-Remove snapshot job
+```sql
+\i statspack_report.sql
+```
 
-- SELECT cron.unschedule ('Statspack Snapshot');
+You'll be prompted for a begin/end snapshot ID. The report is saved as an HTML file: `statspack_<begin>_<end>.html`.
 
-Remove Statspack purging job
+## Schema Reference
 
-- SELECT cron.unschedule ('Statspack Cleanup');
+### Tables
 
-Aurora Statspack Report
+| Table | Description |
+|-------|-------------|
+| `statspack.hist_snapshots` | Snapshot IDs and timestamps |
+| `statspack.hist_active_sessions_waits` | Active sessions with wait events (per-session from `aurora_stat_backend_waits`) |
+| `statspack.hist_stat_system_waits` | System-level wait events (from `aurora_stat_system_waits`) |
+| `statspack.hist_pg_stat_statements` | Query statistics from `pg_stat_statements` |
+| `statspack.hist_pg_stat_database` | Database-level statistics (commits, rollbacks, I/O, deadlocks) |
+| `statspack.hist_pg_stat_all_tables` | Table statistics (scans, tuples, autovacuum) |
+| `statspack.hist_pg_settings` | Database parameter values at snapshot time |
+| `statspack.hist_pg_users` | Database users and their configuration |
+| `statspack.hist_indexes_with_nulls` | Indexes with high null value ratios (optimization candidates) |
+| `statspack.hist_unused_indexes` | Indexes with fewer than 10 scans (drop candidates) |
+| `statspack.hist_dba_plans` | Query plans from `apg_plan_mgmt` |
+| `statspack.statspack_config` | Configuration table (retention days) |
 
-- Connect to the target Aurora DB and execute the statspack report (statspack_report.sql).
-i.e.
-postgres=> \i statspack_report.sql
+### Procedures
+
+| Procedure | Description |
+|-----------|-------------|
+| `statspack.statspack_snapshot()` | Capture a new snapshot from all live views |
+| `statspack.statspack_remove_snapshot(snap_id)` | Remove a specific snapshot and all its data |
+| `statspack.statspack_cleanup()` | Remove snapshots older than the configured retention period |
+
+## Report Sections
+
+The HTML report includes the following analysis between two snapshots:
+
+1. **Database Statistics** — Commits, rollbacks, deadlocks, cache hit ratio, I/O times, temp files
+2. **Active Sessions** — Sessions active at the end snapshot with wait event breakdown
+3. **Top 10 System Wait Events** — Highest wait time events across the instance
+4. **Top 10 Statements by Total Execution Time** — Heaviest queries by cumulative time
+5. **Top 10 Statements by Execution Time per Call** — Slowest queries per invocation
+6. **Top 10 Statements by I/O per Call** — Most I/O-intensive queries per invocation
+7. **Top 10 Statements by Total I/O** — Heaviest queries by cumulative I/O blocks
+8. **Top 10 Statements with Execution Time Deviation** — Queries with unstable performance
+9. **Sequential Scans** — Tables scanned sequentially (may need indexes)
+10. **Indexes with High Null Ratios** — Space optimization opportunities
+11. **Unused Index Candidates** — Indexes that can potentially be dropped
+12. **Heavy Queries — Full Text and Explain Plans** — Complete query text and plan details
+13. **Installed Extensions** — Extensions with available version updates
+14. **DB Parameter Changes** — Settings that changed between snapshots
+
+## Historical Lock Analysis
+
+The `hist_active_sessions_waits` table captures wait events that can help identify lock-related activity. While it does **not** capture the blocker→blocked relationship (that requires `pg_locks` / `pg_blocking_pids()`), you can query tentative lockers and locked sessions:
+
+```sql
+-- Sessions waiting on locks vs active sessions (potential lockers)
+-- for a given snapshot range
+WITH snap_range AS (
+    SELECT snap_id, snap_timestamp
+    FROM statspack.hist_snapshots
+    WHERE snap_id BETWEEN :BEGIN_SNAP AND :END_SNAP
+),
+locked_sessions AS (
+    SELECT h.snap_id, s.snap_timestamp, 'LOCKED' AS session_role,
+           h.pid, h.usename, h.app_name, h.current_wait_type,
+           h.current_wait_event, h.current_state,
+           h.xact_start, h.query_start, h.query
+    FROM statspack.hist_active_sessions_waits h
+    JOIN snap_range s ON h.snap_id = s.snap_id
+    WHERE h.current_wait_type = 'Lock'
+      AND h.current_wait_event <> 'PgSleep'
+      AND h.current_wait_type = h.wait_type
+      AND h.current_wait_event = h.wait_event
+),
+active_not_locked AS (
+    SELECT h.snap_id, s.snap_timestamp, 'TENTATIVE LOCKER' AS session_role,
+           h.pid, h.usename, h.app_name, h.current_wait_type,
+           h.current_wait_event, h.current_state,
+           h.xact_start, h.query_start, h.query
+    FROM statspack.hist_active_sessions_waits h
+    JOIN snap_range s ON h.snap_id = s.snap_id
+    WHERE h.current_wait_type <> 'Lock'
+      AND h.current_wait_event <> 'PgSleep'
+      AND h.current_wait_type = h.wait_type
+      AND h.current_wait_event = h.wait_event
+)
+SELECT snap_id, snap_timestamp, session_role, pid, usename, app_name,
+       current_wait_type, current_wait_event, xact_start, query_start,
+       substr(query, 1, 120) AS partial_query
+FROM (SELECT * FROM locked_sessions UNION ALL SELECT * FROM active_not_locked) combined
+ORDER BY snap_id, session_role DESC, xact_start ASC;
+```
+
+> **Tip:** For definitive blocker→blocked tracking, consider adding a `hist_lock_tree` table that captures `pg_blocking_pids()` output at snapshot time. See the [docs](docs/) folder for details.
+
+## Managing pg_cron Jobs
+
+```sql
+-- List scheduled statspack jobs
+SELECT * FROM cron.job WHERE command LIKE '%statspack%';
+
+-- Check recent job execution history
+SELECT * FROM cron.job_run_details WHERE command LIKE '%statspack%' ORDER BY end_time DESC LIMIT 10;
+
+-- Remove jobs
+SELECT cron.unschedule('Statspack Snapshot');
+SELECT cron.unschedule('Statspack Cleanup');
+```
+
+## License
+
+See [LICENSE](LICENSE) for details.

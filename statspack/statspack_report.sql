@@ -587,6 +587,60 @@ select ' ' as T;
 \pset tuples_only off
 
 \pset tuples_only
+\qecho <h2>LOCK TREE (Last Snapshot)</h2>
+\pset tuples_only off
+\pset border 1
+
+SELECT blocker_pid,
+       blocker_usename AS blocker_user,
+       blocker_app_name AS blocker_app,
+       blocker_state,
+       blocker_xact_start at time zone 'America/New_York' AS blocker_xact_start,
+       substr(blocker_query, 1, 80) AS blocker_partial_query,
+       blocked_pid,
+       blocked_usename AS blocked_user,
+       blocked_app_name AS blocked_app,
+       blocked_xact_start at time zone 'America/New_York' AS blocked_xact_start,
+       substr(blocked_query, 1, 80) AS blocked_partial_query,
+       lock_type,
+       lock_mode,
+       locked_relation
+FROM statspack.hist_lock_tree
+WHERE snap_id = :END_SNAP
+ORDER BY blocker_pid, blocked_pid;
+
+\pset border 0
+\pset tuples_only
+select ' ' as T;
+\pset tuples_only off
+
+\pset tuples_only
+\qecho <h2>LOCK TREE SUMMARY (Across Snapshots)</h2>
+\pset tuples_only off
+\pset border 1
+
+SELECT lt.blocker_pid,
+       lt.blocker_usename AS blocker_user,
+       lt.blocker_app_name AS blocker_app,
+       count(DISTINCT lt.snap_id) AS snapshots_blocking,
+       count(DISTINCT lt.blocked_pid) AS distinct_blocked_pids,
+       string_agg(DISTINCT lt.blocked_pid::text, ', ' ORDER BY lt.blocked_pid::text) AS blocked_pids,
+       min(s.snap_timestamp) at time zone 'America/New_York' AS first_seen,
+       max(s.snap_timestamp) at time zone 'America/New_York' AS last_seen,
+       string_agg(DISTINCT lt.lock_mode, ', ') AS lock_modes,
+       string_agg(DISTINCT lt.locked_relation, ', ') AS locked_relations
+FROM statspack.hist_lock_tree lt
+JOIN statspack.hist_snapshots s ON lt.snap_id = s.snap_id
+WHERE lt.snap_id BETWEEN :BEGIN_SNAP AND :END_SNAP
+GROUP BY lt.blocker_pid, lt.blocker_usename, lt.blocker_app_name
+ORDER BY snapshots_blocking DESC, distinct_blocked_pids DESC;
+
+\pset border 0
+\pset tuples_only
+select ' ' as T;
+\pset tuples_only off
+
+\pset tuples_only
 \qecho <h2>HEAVY QUERIES - FULL TEXT AND EXPLAIN PLANS</h2>
 \pset tuples_only off
 \pset border 1
