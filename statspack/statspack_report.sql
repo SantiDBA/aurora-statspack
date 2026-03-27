@@ -25,7 +25,8 @@ order by snap_id asc;
 \pset border 0
 \pset tuples_only
 \qecho <h1>Aurora PostgreSQL Statspack report - Created by Santiago Villa</h1>
-SELECT 'Statspack v3.0 report generated from '||server_id||' server at ',now() at time zone 'America/New_York' FROM aurora_global_db_instance_status() where session_id='MASTER_SESSION_ID';
+SELECT 'Statspack v'||(select value from statspack.statspack_config where name='version')||' report generated from '||server_id||' server at ',now() at time zone 'America/New_York' FROM aurora_global_db_instance_status() where session_id='MASTER_SESSION_ID';
+
 \pset tuples_only off
 
 \pset border 0

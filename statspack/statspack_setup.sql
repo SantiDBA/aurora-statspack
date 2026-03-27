@@ -5,7 +5,14 @@ create schema IF NOT EXISTS statspack;
 drop table if exists statspack.statspack_config ;
 
 -- Create configuration table
-create table statspack.statspack_config as select 7 as retention_days;
+create table statspack.statspack_config (
+    name text primary key,
+    value text
+);
+
+insert into statspack.statspack_config (name, value) values ('retention_days', '7');
+insert into statspack.statspack_config (name, value) values ('version', '3.0');
+
 
 drop table if exists statspack.hist_snapshots ;
 
@@ -93,7 +100,9 @@ drop table if exists statspack.hist_pg_stat_all_tables ;
 
 create table statspack.hist_pg_stat_all_tables as
 select 1 as snap_id, psat.*, pc.reloptions
-from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid" ;
+from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid"
+where psat.schemaname not in ('pg_catalog', 'information_schema')
+  and (psat.seq_scan + psat.idx_scan + psat.n_tup_ins + psat.n_tup_upd + psat.n_tup_del) > 0;
 
 drop table if exists statspack.hist_indexes_with_nulls ;
 
@@ -297,7 +306,9 @@ from pg_show_all_settings();
 -- insert from  pg_stat_all_tables
 insert into statspack.hist_pg_stat_all_tables 
 select v_snap_id as snap_id, psat.*, pc.reloptions
-from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid" ;
+from pg_stat_all_tables psat join pg_class pc on psat.relid = pc."oid"
+where psat.schemaname not in ('pg_catalog', 'information_schema')
+  and (psat.seq_scan + psat.idx_scan + psat.n_tup_ins + psat.n_tup_upd + psat.n_tup_del) > 0;
 
 insert into statspack.hist_indexes_with_nulls
 select
@@ -469,9 +480,10 @@ from
 where
     snap_timestamp < now() - (
     select
-        retention_days
+        value::integer
     from
-        statspack.statspack_config) * '1 day'::interval) loop
+        statspack.statspack_config
+    where name = 'retention_days') * '1 day'::interval) loop
         call statspack.statspack_remove_snapshot(v_snapshot_rec.snap_id);
 end loop;
 end;
