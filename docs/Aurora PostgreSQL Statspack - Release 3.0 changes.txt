@@ -1,0 +1,22 @@
+Aurora PostgreSQL Statspack - Release 3.0 changes
+
+Date: 27/03/2026
+Author: Santiago Villa
+
+1) New statistics captured.
+
+	a) Lock Tree: Capture blocker/blocked relationships at snapshot time in statspack.hist_lock_tree.
+	b) Unused Indexes: Capture indexes used less than 10 times in statspack.hist_unused_indexes.
+	c) Performance Plans: Capture SQL execution plans from apg_plan_mgmt into statspack.hist_dba_plans.
+	
+2) Performance Optimizations.
+
+	a) Added specialized indexes to Statspack schema tables to optimize snapshot cleanup and report generation queries.
+
+3) Changes to the statspack report.
+
+	a) Added "LOCK TREE" sections to visualize blocking sessions:
+		- Lock Tree (Last Snapshot)
+		- Lock Tree Summary (Across Snapshots)
+	b) Added "TOP 10 INDEXES CANDIDATES TO BE DROPPED" section.
+	c) Updated report header to Version 3.0.
